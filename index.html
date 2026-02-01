@@ -3,32 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>赛博牛马的逆袭</title>
+    <title>赛博牛马任务管理系统</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="赛博牛马的逆袭">
     
-    <!-- 
-      === 🍎 iOS 图标终极修复 ===
-      技巧 1: 使用 apple-touch-icon-precomposed (旧标准，有时权重更高)
-      技巧 2: 在 URL 后添加 &v=refresh_final 参数，强制 iOS 认为这是新图片，忽略旧缓存
-    -->
-    <link rel="apple-touch-icon" href="https://ui-avatars.com/api/?name=%E7%89%9B&background=6366f1&color=fff&size=512&font-size=0.6&bold=true&length=1&v=refresh_final">
-    <link rel="apple-touch-icon-precomposed" href="https://ui-avatars.com/api/?name=%E7%89%9B&background=6366f1&color=fff&size=512&font-size=0.6&bold=true&length=1&v=refresh_final">
-    <link rel="icon" href="https://ui-avatars.com/api/?name=%E7%89%9B&background=6366f1&color=fff&size=512&font-size=0.6&bold=true&length=1&v=refresh_final">
-
-    <!-- 2. 引入 Tailwind CSS -->
+    <!-- 1. 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- 3. 引入 Babel -->
+    <!-- 2. 引入 Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- 4. 依赖包地图 -->
+    <!-- 3. 依赖包地图 -->
     <script type="importmap">
     {
       "imports": {
         "react": "https://esm.sh/react@18.2.0",
-        "react-dom": "https://esm.sh/react-dom@18.2.0",
         "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
         "lucide-react": "https://esm.sh/lucide-react@0.263.1",
         "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2"
@@ -43,8 +32,6 @@
         body { -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
         .fade-in { animation: fadeIn 0.2s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
 <body class="bg-gradient-to-br from-indigo-50 via-purple-50 to-blue-50 min-h-screen text-slate-600 selection:bg-indigo-100 selection:text-indigo-700 pb-safe">
@@ -53,7 +40,6 @@
     <script type="text/babel" data-type="module">
         import React, { useState, useEffect, useMemo, useRef } from 'react';
         import { createRoot } from 'react-dom/client';
-        import { createPortal } from 'react-dom';
         import { createClient } from '@supabase/supabase-js';
         
         import { 
@@ -61,7 +47,7 @@
           ChevronLeft, ChevronRight, Clock, 
           Brain, Sparkles, Loader2, Zap, 
           Upload, Search, Wifi, WifiOff, CloudOff,
-          Download, Database, CheckSquare, Square, Key, AlertCircle, Globe, Cpu, Menu, RefreshCw
+          Download, Database, CheckSquare, Square, Key, AlertCircle
         } from 'lucide-react';
 
         // -----------------------------------------------------------------------------
@@ -75,22 +61,14 @@
         const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
         // -----------------------------------------------------------------------------
-        // AI 逻辑 (Silicon Flow)
+        // AI 逻辑
         // -----------------------------------------------------------------------------
-        const getApiKey = () => localStorage.getItem('silicon_api_key') || "";
-        const getBaseUrl = () => {
-            let url = localStorage.getItem('silicon_base_url') || "https://api.siliconflow.cn/v1";
-            return url.replace(/\/$/, "");
-        };
-        const getModel = () => localStorage.getItem('silicon_model') || "deepseek-ai/DeepSeek-V3";
+        const getApiKey = () => localStorage.getItem('gemini_api_key') || "";
 
         const fetchWithRetry = async (url, options, retries = 3, delay = 1000) => {
           try {
             const response = await fetch(url, options);
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData?.error?.message || `HTTP error! status: ${response.status}`);
-            }
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             return await response.json();
           } catch (error) {
             if (retries > 0) {
@@ -101,56 +79,40 @@
           }
         };
 
-        const callSiliconFlow = async (systemPrompt, userPrompt, jsonMode = false) => {
-            const apiKey = getApiKey();
-            const baseUrl = getBaseUrl();
-            const model = getModel();
-            if (!apiKey) throw new Error("请先在设置中填写 Silicon Flow API Key");
-            const url = `${baseUrl}/chat/completions`;
-            const payload = {
-                model: model,
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: userPrompt }
-                ],
-                temperature: 0.7,
-                stream: false
-            };
-            if (jsonMode) payload.response_format = { type: "json_object" };
-            const result = await fetchWithRetry(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
-                },
-                body: JSON.stringify(payload)
-            });
-            return result.choices?.[0]?.message?.content || "";
-        };
-
         const callGeminiStrategyAnalysis = async (tasks, projects) => {
+          const apiKey = getApiKey();
+          if (!apiKey) throw new Error("请先在设置中填写 API Key (国内需翻墙)");
           const activeProjects = projects.filter(p => p.status === 'active');
           const pendingTasks = tasks.filter(t => t.status !== 'completed');
-          const systemPrompt = `你是一位幽默的“赛博职场导师”。分析用户的任务并给出毒舌但实用的生存建议。请严格按Markdown格式输出，必须包含以下章节：### 📊 搬砖概览... ### 🚨 风险点... ### 🚀 摸鱼建议... ### 🧘‍♂️ 养生经...`;
-          const userPrompt = `当前项目：${activeProjects.map(p=>p.name).join(', ')}。未完成任务总数：${pendingTasks.length}。任务详情：${pendingTasks.slice(0, 10).map(t=>t.content).join('; ')}`;
-          return await callSiliconFlow(systemPrompt, userPrompt);
+          const systemPrompt = `你是一位幽默的“赛博职场导师”。分析用户的任务。请按Markdown格式输出：### 📊 搬砖概览... ### 🚨 风险... ### 🚀 摸鱼建议... ### 🧘‍♂️ 养生...`;
+          const userContent = `项目：${activeProjects.map(p=>p.name).join(', ')}。任务数：${pendingTasks.length}`;
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+          const payload = { contents: [{ parts: [{ text: `分析数据：\n${userContent}` }] }], systemInstruction: { parts: [{ text: systemPrompt }] } };
+          const result = await fetchWithRetry(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          return result.candidates?.[0]?.content?.parts?.[0]?.text || "AI 分析失败";
         };
 
         const callGeminiTaskBreakdown = async (taskContent) => {
-          const systemPrompt = `你是一个高效的执行官。请将用户输入的任务拆解为3-5个具体的子步骤。请直接返回 JSON 格式：{ "steps": ["步骤1", "步骤2"...] }。不要有任何多余的解释文字。`;
-          const resultText = await callSiliconFlow(systemPrompt, `拆解这个任务：${taskContent}`, true);
-          try { return JSON.parse(resultText).steps || []; } catch(e) { return []; }
+          const apiKey = getApiKey();
+          if (!apiKey) throw new Error("需 API Key");
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+          const payload = { contents: [{ parts: [{ text: `拆解任务：${taskContent}` }] }], systemInstruction: { parts: [{ text: `拆解为3-5个子步骤，返回JSON: { "steps": [] }` }] }, generationConfig: { responseMimeType: "application/json" } };
+          const result = await fetchWithRetry(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          const json = JSON.parse(result.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
+          return json.steps || [];
         };
 
         const callGeminiProjectAudit = async (project, tasks) => {
-          const systemPrompt = `你是一个资深项目经理。请分析当前项目任务，找出缺失的步骤并给出优化建议。返回 JSON 格式：{ "missingSteps": ["任务1", "任务2"], "advice": "建议内容" }`;
-          const userPrompt = `项目名称：${project.name}。当前已规划的任务：${tasks.map(t=>t.content).join('; ')}`;
-          const resultText = await callSiliconFlow(systemPrompt, userPrompt, true);
-          try { return JSON.parse(resultText); } catch(e) { return { missingSteps: [], advice: "分析失败" }; }
+          const apiKey = getApiKey();
+          if (!apiKey) throw new Error("需 API Key");
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+          const payload = { contents: [{ parts: [{ text: `项目：${project.name}，任务：${tasks.map(t=>t.content).join(';')}` }] }], systemInstruction: { parts: [{ text: `找出缺失步骤，返回JSON: { "missingSteps": [], "advice": "" }` }] }, generationConfig: { responseMimeType: "application/json" } };
+          const result = await fetchWithRetry(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          return JSON.parse(result.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
         };
 
         // -----------------------------------------------------------------------------
-        // UI 组件
+        // 组件
         // -----------------------------------------------------------------------------
 
         const formatDate = (dateStr) => {
@@ -176,11 +138,12 @@
           <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1Z"/><path d="m9 14 2 2 4-4"/></svg>
         );
 
+        // 确认弹窗组件
         const ConfirmDialog = ({ isOpen, onClose, onConfirm, title, message }) => {
           if (!isOpen) return null;
           return (
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-              <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-200 scale-100 border border-slate-100">
+            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-200 scale-100">
                 <div className="flex items-center gap-3 mb-4 text-red-600">
                     <div className="p-2 bg-red-50 rounded-full"><AlertCircle size={24} /></div>
                     <h3 className="text-lg font-bold text-slate-800">{title}</h3>
@@ -201,12 +164,12 @@
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
               <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full flex flex-col max-h-[85vh] animate-in fade-in zoom-in duration-200">
                 <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gradient-to-r from-violet-600 to-fuchsia-600 rounded-t-xl text-white">
-                  <h3 className="text-lg font-bold flex items-center gap-2"><Brain size={20} /> 军师生存策略报告</h3>
+                  <h3 className="text-lg font-bold flex items-center gap-2"><Brain size={20} /> 牛马生存策略分析</h3>
                   <button onClick={onClose} className="hover:bg-white/20 p-1 rounded-full transition-colors"><X size={20} /></button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-6">
                   {isAnalyzing ? (
-                    <div className="flex flex-col items-center justify-center py-12 space-y-4"><Loader2 size={48} className="text-purple-600 animate-spin" /><h4 className="text-lg font-medium text-gray-800">正在通过 Silicon Flow 请教大模型...</h4></div>
+                    <div className="flex flex-col items-center justify-center py-12 space-y-4"><Loader2 size={48} className="text-purple-600 animate-spin" /><h4 className="text-lg font-medium text-gray-800">AI 正在审视你的人生...</h4></div>
                   ) : (
                     <div className="prose prose-sm md:prose-base max-w-none text-gray-700 space-y-4">
                       {result.split('\n').map((line, idx) => {
@@ -233,11 +196,11 @@
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
               <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full flex flex-col max-h-[85vh] animate-in fade-in zoom-in duration-200">
                 <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gradient-to-r from-blue-600 to-indigo-600 rounded-t-xl text-white">
-                  <h3 className="text-lg font-bold flex items-center gap-2"><Search size={20} /> 项目查漏补缺 (Silicon Flow版)</h3>
+                  <h3 className="text-lg font-bold flex items-center gap-2"><Search size={20} /> 项目查漏补缺</h3>
                   <button onClick={onClose} className="hover:bg-white/20 p-1 rounded-full transition-colors"><X size={20} /></button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-6">
-                  {isAnalyzing ? ( <div className="flex flex-col items-center justify-center py-12 space-y-4"><Loader2 size={48} className="text-blue-600 animate-spin" /><h4 className="text-lg font-medium text-gray-800">正在分析项目流程...</h4></div> ) : (
+                  {isAnalyzing ? ( <div className="flex flex-col items-center justify-center py-12 space-y-4"><Loader2 size={48} className="text-blue-600 animate-spin" /><h4 className="text-lg font-medium text-gray-800">AI 正在审核项目流程...</h4></div> ) : (
                     <div className="space-y-6">
                       <div className="bg-blue-50 p-4 rounded-xl border border-blue-100"><h4 className="font-bold text-blue-900 mb-2 flex items-center gap-2"><Brain size={18}/> AI 优化建议</h4><div className="prose prose-sm text-blue-800">{(data?.advice || "暂无建议").split('\n').map((line, i) => <p key={i} className="mb-1">{line}</p>)}</div></div>
                       <div><h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><ListCheck size={18} className="text-green-600"/> 建议补充的任务</h4>{data?.missingSteps && data.missingSteps.length > 0 ? ( <div className="space-y-2">{data.missingSteps.map((task, idx) => ( <div key={idx} onClick={() => toggleTask(task)} className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors"><div className={selectedTasks.includes(task) ? "text-blue-600" : "text-gray-300"}>{selectedTasks.includes(task) ? <CheckSquare size={20} /> : <Square size={20} />}</div><span className="text-gray-700 text-sm font-medium">{task}</span></div> ))}</div> ) : <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-200">🎉 流程非常完善！</div>}</div>
@@ -252,70 +215,27 @@
 
         const SettingsModal = ({ isOpen, onClose, onExport, onImport, isProcessing, isOffline, onSyncToCloud }) => {
           const fileInputRef = useRef(null);
-          const [userKey, setUserKey] = useState(localStorage.getItem('silicon_api_key') || '');
-          const [baseUrl, setBaseUrl] = useState(localStorage.getItem('silicon_base_url') || 'https://api.siliconflow.cn/v1');
-          const [selectedModel, setSelectedModel] = useState(localStorage.getItem('silicon_model') || 'deepseek-ai/DeepSeek-V3');
-          
+          const [userKey, setUserKey] = useState(localStorage.getItem('gemini_api_key') || '');
           if (!isOpen) return null;
-          
-          const handleSaveSettings = () => { 
-            localStorage.setItem('silicon_api_key', userKey.trim());
-            localStorage.setItem('silicon_base_url', baseUrl.trim());
-            localStorage.setItem('silicon_model', selectedModel.trim());
-            alert("Silicon Flow 配置已保存"); 
-          };
+          const handleSaveKey = () => { localStorage.setItem('gemini_api_key', userKey.trim()); alert("API Key 已保存"); };
           const handleFileChange = (e) => { const file = e.target.files[0]; if (file) onImport(file); e.target.value = null; };
-
-          const modelOptions = [
-            { label: 'DeepSeek-V3', value: 'deepseek-ai/DeepSeek-V3' },
-            { label: 'DeepSeek-R1', value: 'deepseek-ai/DeepSeek-R1' },
-            { label: 'DeepSeek-V2.5', value: 'deepseek-ai/DeepSeek-V2.5' },
-            { label: 'Qwen 2.5 72B', value: 'Qwen/Qwen2.5-72B-Instruct' },
-            { label: 'Llama 3.1 70B', value: 'meta-llama/Meta-Llama-3.1-70B-Instruct' }
-          ];
 
           return (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-              <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
-                <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4"><h3 className="text-xl font-bold text-gray-900 flex items-center gap-2"><Settings size={24} className="text-gray-500" /> 系统设置</h3><button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button></div>
+              <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 animate-in fade-in zoom-in duration-200">
+                <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4"><h3 className="text-xl font-bold text-gray-900 flex items-center gap-2"><Settings size={24} className="text-gray-500" /> 数据管理</h3><button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={24} /></button></div>
                 <div className="space-y-6">
                   {isOffline && (
                     <div className="bg-amber-50 p-4 rounded-lg border border-amber-100">
-                        <h4 className="font-bold text-amber-900 mb-2 flex items-center gap-2"><CloudOff size={18} /> 离线状态</h4>
-                        <button onClick={onSyncToCloud} disabled={isProcessing} className="w-full py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition flex items-center justify-center gap-2 font-medium shadow-sm">{isProcessing ? <Loader2 className="animate-spin" size={18}/> : <RefreshCw size={18}/>} 重试连接云端</button>
+                        <h4 className="font-bold text-amber-900 mb-2 flex items-center gap-2"><CloudOff size={18} /> 当前为离线模式</h4>
+                        <p className="text-xs text-amber-700 mb-3">数据仅保存在本地。如果您现在连上网了（需翻墙），可以尝试将本地数据推送到 Supabase 云端。</p>
+                        <button onClick={onSyncToCloud} disabled={isProcessing} className="w-full py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition flex items-center justify-center gap-2 font-medium shadow-sm">{isProcessing ? <Loader2 className="animate-spin" size={18}/> : <Upload size={18}/>} 尝试上传本地数据到云端</button>
                     </div>
                   )}
 
-                  <div className="bg-violet-50 p-4 rounded-lg border border-violet-100">
-                    <h4 className="font-bold text-violet-900 mb-3 flex items-center gap-2"><Cpu size={18} /> Silicon Flow AI 配置</h4>
-                    <div className="space-y-4">
-                        <div>
-                            <label className="text-xs font-bold text-violet-800 mb-1 block">API Key</label>
-                            <input type="password" value={userKey} onChange={(e) => setUserKey(e.target.value)} placeholder="sk-..." className="w-full px-3 py-2 border border-violet-200 rounded text-sm focus:ring-2 focus:ring-violet-300 outline-none" />
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-violet-800 mb-1 block">API 地址</label>
-                            <input type="text" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} className="w-full px-3 py-2 border border-violet-200 rounded text-sm focus:ring-2 focus:ring-violet-300 outline-none" />
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-violet-800 mb-1 block">模型选择</label>
-                            <select value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)} className="w-full px-3 py-2 border border-violet-200 rounded text-sm focus:ring-2 focus:ring-violet-300 outline-none bg-white">
-                                {modelOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                                <option value="custom">自定义模型 ID...</option>
-                            </select>
-                            {selectedModel === 'custom' && (
-                                <input type="text" placeholder="输入模型完整 ID" onBlur={(e) => setSelectedModel(e.target.value)} className="mt-2 w-full px-3 py-2 border border-violet-200 rounded text-sm focus:ring-2 focus:ring-violet-300 outline-none" />
-                            )}
-                        </div>
-                        <button onClick={handleSaveSettings} className="w-full py-2 bg-violet-600 text-white rounded-lg font-bold hover:bg-violet-700 transition shadow-sm">保存 AI 配置</button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <button onClick={onExport} disabled={isProcessing} className="py-2 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-100 transition flex items-center justify-center gap-2 text-sm font-bold"><Download size={16} /> 导出备份</button>
-                    <button onClick={() => fileInputRef.current?.click()} disabled={isProcessing} className="py-2 bg-orange-50 text-orange-600 border border-orange-200 rounded-lg hover:bg-orange-100 transition flex items-center justify-center gap-2 text-sm font-bold"><Upload size={16} /> 导入恢复</button>
-                    <input type="file" ref={fileInputRef} accept=".json" onChange={handleFileChange} className="hidden" />
-                  </div>
+                  <div className="bg-purple-50 p-4 rounded-lg border border-purple-100"><h4 className="font-bold text-purple-900 mb-2 flex items-center gap-2"><Key size={18} /> AI 引擎配置</h4><div className="flex gap-2"><input type="password" value={userKey} onChange={(e) => setUserKey(e.target.value)} placeholder="输入 Gemini API Key" className="flex-1 px-3 py-2 border border-purple-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-300" /><button onClick={handleSaveKey} className="px-3 py-2 bg-purple-600 text-white rounded text-sm font-bold hover:bg-purple-700">保存</button></div></div>
+                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-100"><h4 className="font-bold text-blue-900 mb-2 flex items-center gap-2"><Download size={18} /> 备份数据</h4><p className="text-sm text-blue-700 mb-4">导出当前数据（JSON格式）。</p><button onClick={onExport} disabled={isProcessing} className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-2 font-medium shadow-sm">{isProcessing ? <Loader2 className="animate-spin" size={18} /> : <Download size={18} />} 导出备份文件</button></div>
+                  <div className="bg-orange-50 p-4 rounded-lg border border-orange-100"><h4 className="font-bold text-orange-900 mb-2 flex items-center gap-2"><Upload size={18} /> 恢复数据</h4><p className="text-sm text-orange-700 mb-4">从本地文件恢复。</p><input type="file" ref={fileInputRef} accept=".json" onChange={handleFileChange} className="hidden" /><button onClick={() => fileInputRef.current?.click()} disabled={isProcessing} className="w-full py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition flex items-center justify-center gap-2 font-medium shadow-sm">{isProcessing ? <Loader2 className="animate-spin" size={18} /> : <Upload size={18} />} 选择文件并恢复</button></div>
                 </div>
               </div>
             </div>
@@ -324,68 +244,14 @@
 
         const CustomDatePicker = ({ isOpen, onClose, onSelect, initialDate }) => {
           const [currentMonth, setCurrentMonth] = useState(new Date());
-          const [selectedDay, setSelectedDay] = useState(new Date().getDate());
+          const [selectedDay, setSelectedDay] = useState(initialDate ? new Date(initialDate).getDate() : new Date().getDate());
           const popupRef = useRef();
-
-          useEffect(() => {
-            if (isOpen) {
-              const d = initialDate ? new Date(initialDate) : new Date();
-              setCurrentMonth(d);
-              setSelectedDay(d.getDate());
-            }
-          }, [isOpen, initialDate]);
-
+          useEffect(() => { if (isOpen) { const d = initialDate ? new Date(initialDate) : new Date(); setCurrentMonth(d); setSelectedDay(d.getDate()); } }, [isOpen, initialDate]);
+          useEffect(() => { const l=(e)=>{if(!popupRef.current||popupRef.current.contains(e.target))return;onClose();};document.addEventListener("mousedown",l);return()=>document.removeEventListener("mousedown",l);},[onClose]);
           if (!isOpen) return null;
-
           const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
           const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
-
-          return createPortal(
-            <div 
-              className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200"
-              onClick={onClose}
-            >
-              <div 
-                ref={popupRef} 
-                className="bg-white shadow-2xl rounded-2xl border border-slate-100 p-6 w-full max-w-sm flex flex-col gap-5 animate-in zoom-in-95 duration-200"
-                onClick={e => e.stopPropagation()}
-              >
-                <div className="flex justify-between items-center font-bold text-slate-800 border-b pb-3">
-                  <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth()-1)))} className="p-2 hover:bg-slate-100 rounded-lg transition-colors"><ChevronLeft size={20}/></button>
-                  <span className="text-lg">{currentMonth.getFullYear()}年 {currentMonth.getMonth() + 1}月</span>
-                  <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth()+1)))} className="p-2 hover:bg-slate-100 rounded-lg transition-colors"><ChevronRight size={20}/></button>
-                </div>
-
-                <div className="grid grid-cols-7 gap-1 text-center text-sm mb-2">
-                  {['日','一','二','三','四','五','六'].map(d=><div key={d} className="text-slate-400 font-medium py-1">{d}</div>)}
-                  {Array.from({length: firstDay}).map((_,i)=><div key={'e'+i}/>)}
-                  {Array.from({length: daysInMonth}).map((_,i)=>{
-                    const d=i+1;
-                    const isToday = isSameDay(new Date(), new Date(currentMonth.getFullYear(), currentMonth.getMonth(), d));
-                    return (
-                      <button 
-                        key={d} 
-                        onClick={()=>setSelectedDay(d)} 
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${d===selectedDay?'bg-indigo-600 text-white shadow-lg shadow-indigo-200':'hover:bg-indigo-50 text-slate-700'} ${isToday && d !== selectedDay ? 'text-indigo-600 font-bold' : ''}`}
-                      >
-                        {d}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="pt-4 border-t border-slate-100">
-                  <p className="text-xs font-bold text-slate-400 mb-3 ml-1 uppercase tracking-wider">选择具体时间点</p>
-                  <div className="grid grid-cols-4 gap-2">
-                    {[9,12,15,18,21].map(h=><button key={h} onClick={()=>{const d=new Date(currentMonth); d.setDate(selectedDay); d.setHours(h); d.setMinutes(0); onSelect(d.toISOString()); onClose();}} className="text-xs py-2.5 font-bold bg-slate-50 hover:bg-indigo-600 hover:text-white text-indigo-600 rounded-xl transition-all">{h}:00</button>)}
-                  </div>
-                </div>
-
-                <button onClick={onClose} className="mt-2 w-full py-3 bg-slate-100 text-slate-500 rounded-xl font-bold hover:bg-slate-200 transition-colors">取消</button>
-              </div>
-            </div>,
-            document.body
-          );
+          return (<div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/10 backdrop-blur-[1px]"><div ref={popupRef} className="bg-white shadow-2xl rounded-xl border border-slate-100 p-5 w-80 flex flex-col gap-4 animate-in zoom-in-95"><div className="flex justify-between items-center font-bold text-slate-700"><button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth()-1)))} className="p-1 hover:bg-slate-100 rounded"><ChevronLeft size={20}/></button><span>{currentMonth.getFullYear()}年 {currentMonth.getMonth() + 1}月</span><button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth()+1)))} className="p-1 hover:bg-slate-100 rounded"><ChevronRight size={20}/></button></div><div className="grid grid-cols-7 gap-1 text-center text-sm">{['日','一','二','三','四','五','六'].map(d=><div key={d} className="text-slate-400">{d}</div>)}{Array.from({length: firstDay}).map((_,i)=><div key={'e'+i}/>)}{Array.from({length: daysInMonth}).map((_,i)=>{const d=i+1;return <button key={d} onClick={()=>setSelectedDay(d)} className={`w-8 h-8 rounded-full ${d===selectedDay?'bg-indigo-500 text-white':'hover:bg-slate-100'}`}>{d}</button>})}</div><div className="grid grid-cols-4 gap-2 pt-2 border-t border-slate-100">{[9,12,15,18].map(h=><button key={h} onClick={()=>{const d=new Date(currentMonth); d.setDate(selectedDay); d.setHours(h); d.setMinutes(0); onSelect(d.toISOString()); onClose();}} className="text-xs py-1 bg-slate-50 hover:bg-indigo-50 text-indigo-600 rounded">{h}:00</button>)}</div></div></div>);
         };
 
         const TaskItem = ({ task, project, assigners = [], onUpdate, onDeleteRequest, onViewProject, onSmartBreakdown, breakdownLoadingId }) => {
@@ -394,22 +260,7 @@
            const isBreakingDown = breakdownLoadingId === task.id;
            let bgClass = "bg-white border-slate-200";
            if(task.status==='completed') bgClass="opacity-60 bg-slate-50"; else if(task.is_important) bgClass="bg-yellow-50 border-yellow-200"; else if(isOverdue) bgClass="bg-green-50 border-green-200";
-           
-           return (
-             <div className={`flex items-center gap-2 p-3 rounded-lg border hover:shadow-sm transition-all ${bgClass} group fade-in`}>
-                <div className="relative flex items-center justify-center">
-                    <button 
-                        onClick={()=>onUpdate(task.id, {status:task.status==='completed'?'active':'completed', completed_at: new Date().toISOString()})} 
-                        className={`w-11 h-11 flex items-center justify-center -ml-2 rounded-full active:bg-slate-100 transition-colors ${task.status==='completed'?'text-slate-400':'text-slate-300 hover:text-indigo-500'}`}
-                    >
-                        {task.status==='completed'?<CheckCircle size={20}/>:<Circle size={20}/>}
-                    </button>
-                </div>
-                <div className="flex-1 min-w-0">
-                    <textarea rows={1} className={`bg-transparent w-full outline-none resize-none overflow-hidden line-clamp-2 whitespace-normal ${task.status==='completed'?'line-through text-slate-400':'text-slate-700'}`} defaultValue={task.content} onBlur={(e)=>onUpdate(task.id,{content:e.target.value})} onInput={(e) => {e.target.style.height = 'auto';e.target.style.height = (e.target.scrollHeight) + 'px';}}/>
-                    {project && <div onClick={onViewProject} className="text-[10px] text-slate-400 hover:text-indigo-500 cursor-pointer">#{project.name}</div>}
-                </div>
-                <div className="w-24 flex-shrink-0 relative hidden sm:block"><input type="text" list={`assigners-${task.id}`} defaultValue={task.assigner} placeholder="对接人" onBlur={(e) => { if (e.target.value !== task.assigner) onUpdate(task.id, { assigner: e.target.value }); }} className="bg-transparent w-full text-xs text-slate-500 text-right outline-none focus:text-indigo-600 placeholder:text-slate-300"/><datalist id={`assigners-${task.id}`}>{assigners.map((a, i) => <option key={i} value={a} />)}</datalist></div><div onClick={() => setShowDatePicker(true)} className="flex-shrink-0 w-24 text-right text-xs text-slate-500 cursor-pointer hover:text-indigo-600 flex items-center justify-end gap-1"><Clock size={12} className={isOverdue ? "text-green-500" : ""} />{task.plan_date ? formatDate(task.plan_date).split(' ')[0] + ' ' + formatDate(task.plan_date).split(' ')[1] : '计划时间'}</div>{task.status !== 'completed' && (<button onClick={() => onSmartBreakdown(task)} disabled={isBreakingDown} className={`text-slate-300 hover:text-violet-500 p-1 rounded hover:bg-violet-50 transition-all ${isBreakingDown ? 'animate-pulse text-violet-500' : 'opacity-0 group-hover:opacity-100'}`} title="AI 智能拆解">{isBreakingDown ? <Loader2 size={16} className="animate-spin"/> : <Zap size={16}/>}</button>)}<button onClick={()=>onUpdate(task.id,{is_important:!task.is_important})} className="text-slate-300 hover:scale-110">{<Star size={16} className={task.is_important?"fill-yellow-400 text-yellow-400":""}/>}</button><button onClick={(e) => { e.stopPropagation(); onDeleteRequest(task.id); }} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 hover:scale-110 transition-transform"><Trash2 size={16}/></button><CustomDatePicker isOpen={showDatePicker} onClose={() => setShowDatePicker(false)} onSelect={(date) => onUpdate(task.id, { plan_date: date })} initialDate={task.plan_date} /></div>);
+           return (<div className={`flex items-center gap-2 p-3 rounded-lg border hover:shadow-sm transition-all ${bgClass} group fade-in`}><button onClick={()=>onUpdate(task.id, {status:task.status==='completed'?'active':'completed', completed_at: new Date().toISOString()})} className={task.status==='completed'?'text-slate-400':'text-slate-300 hover:text-indigo-500'}>{task.status==='completed'?<CheckCircle size={18}/>:<Circle size={18}/>}</button><div className="flex-1 min-w-0"><textarea rows={1} className={`bg-transparent w-full outline-none resize-none overflow-hidden line-clamp-2 whitespace-normal ${task.status==='completed'?'line-through text-slate-400':'text-slate-700'}`} defaultValue={task.content} onBlur={(e)=>onUpdate(task.id,{content:e.target.value})} onInput={(e) => {e.target.style.height = 'auto';e.target.style.height = (e.target.scrollHeight) + 'px';}}/>{project && <div onClick={onViewProject} className="text-[10px] text-slate-400 hover:text-indigo-500 cursor-pointer">#{project.name}</div>}</div><div className="w-24 flex-shrink-0 relative hidden sm:block"><input type="text" list={`assigners-${task.id}`} defaultValue={task.assigner} placeholder="对接人" onBlur={(e) => { if (e.target.value !== task.assigner) onUpdate(task.id, { assigner: e.target.value }); }} className="bg-transparent w-full text-xs text-slate-500 text-right outline-none focus:text-indigo-600 placeholder:text-slate-300"/><datalist id={`assigners-${task.id}`}>{assigners.map((a, i) => <option key={i} value={a} />)}</datalist></div><div onClick={() => setShowDatePicker(true)} className="flex-shrink-0 w-24 text-right text-xs text-slate-500 cursor-pointer hover:text-indigo-600 flex items-center justify-end gap-1"><Clock size={12} className={isOverdue ? "text-green-500" : ""} />{task.plan_date ? formatDate(task.plan_date).split(' ')[0] + ' ' + formatDate(task.plan_date).split(' ')[1] : '计划时间'}</div>{task.status !== 'completed' && (<button onClick={() => onSmartBreakdown(task)} disabled={isBreakingDown} className={`text-slate-300 hover:text-violet-500 p-1 rounded hover:bg-violet-50 transition-all ${isBreakingDown ? 'animate-pulse text-violet-500' : 'opacity-0 group-hover:opacity-100'}`} title="AI 智能拆解">{isBreakingDown ? <Loader2 size={16} className="animate-spin"/> : <Zap size={16}/>}</button>)}<button onClick={()=>onUpdate(task.id,{is_important:!task.is_important})} className="text-slate-300 hover:scale-110">{<Star size={16} className={task.is_important?"fill-yellow-400 text-yellow-400":""}/>}</button><button onClick={() => onDeleteRequest(task.id)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 hover:scale-110 transition-transform"><Trash2 size={16}/></button><CustomDatePicker isOpen={showDatePicker} onClose={() => setShowDatePicker(false)} onSelect={(date) => onUpdate(task.id, { plan_date: date })} initialDate={task.plan_date} /></div>);
         };
 
         const ProjectCard = ({ project, onClick, onDeleteRequest, onUpdate, onComplete }) => (
@@ -421,7 +272,7 @@
            const importantTasks = tasks.filter(t=>t.status!=='completed' && t.is_important);
            const overdueTasks = tasks.filter(t => t.status !== 'completed' && !t.is_important && t.plan_date && new Date(t.plan_date) < new Date());
            return (
-             <div className="space-y-8 animate-in"><div className="grid grid-cols-1 md:grid-cols-2 gap-6"><section className="bg-white/50 p-4 rounded-xl border border-yellow-100 backdrop-blur-sm"><h3 className="flex items-center gap-2 text-lg font-bold text-slate-800 mb-3"><Star className="fill-yellow-400 text-yellow-400" size={20}/> 重要节点</h3><div className="space-y-2">{importantTasks.length > 0 ? importantTasks.map(t=>(<TaskItem key={t.id} task={t} project={projects.find(p=>p.id===t.project_id)} assigners={assigners} onUpdate={onUpdateTask} onDeleteRequest={onDeleteTaskRequest} onViewProject={()=>onViewProject(t.project_id)} onSmartBreakdown={onSmartBreakdown} breakdownLoadingId={breakdownLoadingId}/>)) : <div className="text-slate-400 text-sm text-center py-4">暂无重要待办</div>}</div></section><section className="bg-white/50 p-4 rounded-xl border border-green-100 backdrop-blur-sm"><h3 className="flex items-center gap-2 text-lg font-bold text-slate-800 mb-3"><Clock className="text-green-500" size={20}/> 逾期节点</h3><div className="space-y-2">{overdueTasks.length > 0 ? overdueTasks.map(t=>(<TaskItem key={t.id} task={t} project={projects.find(p=>p.id===t.project_id)} assigners={assigners} onUpdate={onUpdateTask} onDeleteRequest={onDeleteTaskRequest} onViewProject={()=>onViewProject(t.project_id)} onSmartBreakdown={onSmartBreakdown} breakdownLoadingId={breakdownLoadingId}/>)) : <div className="text-slate-400 text-sm text-center py-4">无逾期任务</div>}</div></section></div><section><h3 className="text-lg font-bold text-slate-800 mb-3">项目看板</h3><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{activeProjects.map(p=><ProjectCard key={p.id} project={p} onClick={()=>onViewProject(p.id)} onDeleteRequest={onDeleteProjectRequest} onUpdate={onUpdateProject} onComplete={()=>onUpdateProject(p.id,{status:'completed'})} />)}<button onClick={onCreateProject} className="border-2 border-dashed border-slate-300 bg-white/30 rounded-xl h-32 flex flex-col items-center justify-center text-slate-500 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50/50 transition-all"><Plus size={24}/><span className="text-xs mt-1">新项目</span></button></div></section></div>
+             <div className="space-y-8 animate-in"><div className="grid grid-cols-1 md:grid-cols-2 gap-6"><section className="bg-white/50 p-4 rounded-xl border border-yellow-100 backdrop-blur-sm"><h3 className="flex items-center gap-2 text-lg font-bold text-slate-800 mb-3"><Star className="fill-yellow-400 text-yellow-400" size={20}/> 重要节点</h3><div className="space-y-2">{importantTasks.length > 0 ? importantTasks.map(t=>(<TaskItem key={t.id} task={t} project={projects.find(p=>p.id===t.project_id)} assigners={assigners} onUpdate={onUpdateTask} onDeleteRequest={onDeleteTaskRequest} onViewProject={()=>onViewProject(t.project_id)} onSmartBreakdown={onSmartBreakdown} breakdownLoadingId={breakdownLoadingId}/>)) : <div className="text-slate-400 text-sm text-center py-4">暂无重要待办</div>}</div></section><section className="bg-white/50 p-4 rounded-xl border border-green-100 backdrop-blur-sm"><h3 className="flex items-center gap-2 text-lg font-bold text-slate-800 mb-3"><Clock className="text-green-500" size={20}/> 逾期节点</h3><div className="space-y-2">{overdueTasks.length > 0 ? overdueTasks.map(t=>(<TaskItem key={t.id} task={t} project={projects.find(p=>p.id===t.project_id)} assigners={assigners} onUpdate={onUpdateTask} onDeleteRequest={onDeleteTaskRequest} onViewProject={()=>onViewProject(t.project_id)} onSmartBreakdown={onSmartBreakdown} breakdownLoadingId={breakdownLoadingId}/>)) : <div className="text-slate-400 text-sm text-center py-4">无逾期任务，真棒！</div>}</div></section></div><section><h3 className="text-lg font-bold text-slate-800 mb-3">项目看板</h3><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{activeProjects.map(p=><ProjectCard key={p.id} project={p} onClick={()=>onViewProject(p.id)} onDeleteRequest={onDeleteProjectRequest} onUpdate={onUpdateProject} onComplete={()=>onUpdateProject(p.id,{status:'completed'})} />)}<button onClick={onCreateProject} className="border-2 border-dashed border-slate-300 bg-white/30 rounded-xl h-32 flex flex-col items-center justify-center text-slate-500 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50/50 transition-all"><Plus size={24}/><span className="text-xs mt-1">新项目</span></button></div></section></div>
            );
         };
 
@@ -449,14 +300,13 @@
         const QuickCreateModal = ({ isOpen, onClose, projects, assigners, onCreate }) => {
            const [content, setC] = useState(''); const [pid, setP] = useState('');
            if(!isOpen) return null;
-           return (<div className="fixed inset-0 bg-black/30 z-[1000] flex items-center justify-center p-4 backdrop-blur-sm"><div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95"><h3 className="font-bold text-lg mb-4">快速创建</h3><form onSubmit={(e)=>{e.preventDefault(); if(content){onCreate({content, project_id:pid, assigner:'', plan_date:new Date().toISOString(), is_important:false}); setC(''); onClose();}}}><input name="c" className="w-full border border-slate-200 rounded-lg p-3 mb-4 outline-none focus:border-indigo-500" autoFocus placeholder="做什么?" value={content} onChange={e=>setC(e.target.value)}/><select name="p" className="w-full border border-slate-200 rounded-lg p-3 mb-6 bg-white" value={pid} onChange={e=>setP(e.target.value)}><option value="">杂项 (无项目)</option>{projects.filter(p=>p.status==='active').map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select><button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-indigo-200">创建</button><button type="button" onClick={onClose} className="w-full mt-2 text-slate-400 py-2">取消</button></form></div></div>)
+           return (<div className="fixed inset-0 bg-black/30 z-40 flex items-center justify-center p-4 backdrop-blur-sm"><div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95"><h3 className="font-bold text-lg mb-4">快速创建</h3><form onSubmit={(e)=>{e.preventDefault(); if(content){onCreate({content, project_id:pid, assigner:'', plan_date:new Date().toISOString(), is_important:false}); setC(''); onClose();}}}><input name="c" className="w-full border border-slate-200 rounded-lg p-3 mb-4 outline-none focus:border-indigo-500" autoFocus placeholder="做什么?" value={content} onChange={e=>setC(e.target.value)}/><select name="p" className="w-full border border-slate-200 rounded-lg p-3 mb-6 bg-white" value={pid} onChange={e=>setP(e.target.value)}><option value="">杂项 (无项目)</option>{projects.filter(p=>p.status==='active').map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select><button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-indigo-200">创建</button><button type="button" onClick={onClose} className="w-full mt-2 text-slate-400 py-2">取消</button></form></div></div>)
         };
 
         function App() {
           const [projects, setProjects] = useState([]);
           const [tasks, setTasks] = useState([]);
           const [isOffline, setIsOffline] = useState(false); 
-          const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
           
           const [currentTab, setCurrentTab] = useState('main'); 
           const [editingProjectId, setEditingProjectId] = useState(null); 
@@ -474,6 +324,7 @@
           const [auditLoading, setAuditLoading] = useState(false);
           const [breakdownLoadingId, setBreakdownLoadingId] = useState(null);
 
+          // 删除确认弹窗的状态
           const [confirmData, setConfirmData] = useState({ isOpen: false, id: null, type: null, title: '', msg: '' });
 
           const assigners = useMemo(() => [...new Set(tasks.map(t => t.assigner).filter(Boolean))], [tasks]);
@@ -481,15 +332,12 @@
           useEffect(() => {
             const initData = async () => {
               try {
-                // 增加超时时间到10秒，应对国内网络
-                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000));
-                
                 const pPromise = supabase.from('projects').select('*').eq('app_id', PUBLIC_APP_ID).order('created_at', { ascending: false });
                 const tPromise = supabase.from('tasks').select('*').eq('app_id', PUBLIC_APP_ID).order('created_at', { ascending: false });
                 
                 const [pRes, tRes] = await Promise.race([
                     Promise.all([pPromise, tPromise]),
-                    timeoutPromise
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
                 ]);
 
                 if (pRes.error) throw pRes.error;
@@ -497,7 +345,6 @@
 
                 setProjects(pRes.data);
                 setTasks(tRes.data);
-                setIsOffline(false); // 明确标记为在线
                 console.log("Connected to Supabase Cloud");
 
                 const channel = supabase.channel('cyber_ox_realtime')
@@ -519,8 +366,8 @@
                 console.warn("Supabase connect failed, switching to Local Mode:", err);
                 setIsOffline(true);
                 const localData = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '{"projects":[], "tasks":[]}');
-                setProjects(localData.projects || []);
-                setTasks(localData.tasks || []);
+                setProjects(localData.projects);
+                setTasks(localData.tasks);
               }
             };
             initData();
@@ -586,16 +433,23 @@
           const executeDelete = async () => {
             const { type, id } = confirmData;
             if (!type || !id) return;
+
             setConfirmData({ isOpen: false, id: null, type: null, title: '', msg: '' });
 
             try {
                 if (type === 'task') {
+                    // 乐观更新：立刻在本地移除，不等服务器返回
                     setTasks(prev => prev.filter(t => t.id !== id));
-                    if (!isOffline) await supabase.from('tasks').delete().eq('id', id);
+                    
+                    if (!isOffline) {
+                        await supabase.from('tasks').delete().eq('id', id);
+                    }
                 } else if (type === 'project') {
+                    // 乐观更新
                     setProjects(prev => prev.filter(p => p.id !== id));
                     setTasks(prev => prev.filter(t => t.project_id !== id)); 
                     if(editingProjectId===id) setEditingProjectId(null); 
+
                     if (!isOffline) {
                         await supabase.from('tasks').delete().eq('project_id', id);
                         await supabase.from('projects').delete().eq('id', id);
@@ -608,18 +462,18 @@
           };
 
           const handleSyncToCloud = async () => {
+             if (!confirm("确定要尝试连接云端吗？这可能需要网络通畅。如果连接成功，本地数据将覆盖或合并到云端。")) return;
              setIsProcessingData(true);
              try {
-                 // 重新尝试连接云端
                  const { error: pErr } = await supabase.from('projects').upsert(projects);
                  if (pErr) throw pErr;
                  const { error: tErr } = await supabase.from('tasks').upsert(tasks);
                  if (tErr) throw tErr;
-                 alert("连接成功！即将刷新页面。");
+                 alert("同步成功！即将切换回在线模式。");
                  localStorage.removeItem(LOCAL_STORAGE_KEY); 
                  window.location.reload();
              } catch (e) {
-                 alert("连接失败 (网络仍不可用?): " + e.message);
+                 alert("同步失败 (网络仍不可用?): " + e.message);
              } finally {
                  setIsProcessingData(false);
              }
@@ -719,45 +573,31 @@
 
           return (
             <div className="min-h-screen pb-20">
-              <header className="bg-white/80 backdrop-blur-md sticky top-0 z-30 border-b border-slate-100 shadow-sm px-4 md:px-8 py-2 flex flex-col items-center justify-between gap-2">
-                 <div className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-3">
-                        <div className="bg-indigo-600 text-white w-8 h-8 flex items-center justify-center rounded-lg font-bold text-lg shadow-md shadow-indigo-200">牛</div>
-                        <h1 className="font-bold text-lg tracking-tight text-slate-800">赛博牛马的逆袭</h1>
-                    </div>
-                    {/* Mobile Menu Icon */}
-                    <div className="flex md:hidden items-center gap-2">
-                        {isOffline && <div onClick={handleSyncToCloud} className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-600 cursor-pointer animate-pulse"><WifiOff size={12}/>离线</div>}
-                        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-slate-600 bg-slate-100 rounded-lg active:bg-slate-200 transition-colors"><Menu size={20} /></button>
+              <header className="bg-white/80 backdrop-blur-md sticky top-0 z-30 border-b border-slate-100 shadow-sm px-4 md:px-8 h-16 flex items-center justify-between">
+                 <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-3"><div className="bg-indigo-600 text-white w-8 h-8 flex items-center justify-center rounded-lg font-bold text-lg shadow-md shadow-indigo-200">牛</div><h1 className="font-bold text-xl tracking-tight text-slate-800 hidden md:block">赛博牛马 (双模版)</h1></div>
+                    <nav className="hidden md:flex items-center gap-1 bg-slate-100/50 p-1 rounded-lg">
+                       {[{ id: 'main', label: '主页面' }, { id: 'history', label: '已执行' }, { id: 'completedProjects', label: '已完成' }, { id: 'weekly', label: '周报' }].map(tab => (
+                         <button key={tab.id} onClick={() => { setCurrentTab(tab.id); setEditingProjectId(null); }} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${currentTab === tab.id && !editingProjectId ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{tab.label}</button>
+                       ))}
+                    </nav>
+                    <div className="md:hidden flex gap-2">
+                      <select value={currentTab} onChange={(e) => { setCurrentTab(e.target.value); setEditingProjectId(null); }} className="bg-slate-100 rounded-lg text-sm px-2 py-1 outline-none w-24 truncate border-none focus:ring-0">
+                        <option value="main">主页面</option>
+                        <option value="history">已执行</option>
+                        <option value="completedProjects">完工</option>
+                        <option value="weekly">周报</option>
+                      </select>
                     </div>
                  </div>
-
-                 {/* Mobile Dropdown Menu */}
-                 {isMobileMenuOpen && (
-                    <div className="md:hidden w-full bg-white border border-slate-100 shadow-xl rounded-xl p-2 grid grid-cols-4 gap-2 mb-2 animate-in fade-in slide-in-from-top-2">
-                        <button onClick={() => { handleCreateProject(); setIsMobileMenuOpen(false); }} className="flex flex-col items-center justify-center p-2 rounded-lg hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 gap-1"><Plus size={20}/><span className="text-xs">项目</span></button>
-                        <button onClick={() => { setShowQuickCreate(true); setIsMobileMenuOpen(false); }} className="flex flex-col items-center justify-center p-2 rounded-lg hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 gap-1"><Zap size={20}/><span className="text-xs">节点</span></button>
-                        <button onClick={() => { handleRunAdvisor(); setIsMobileMenuOpen(false); }} className="flex flex-col items-center justify-center p-2 rounded-lg hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 gap-1"><Sparkles size={20}/><span className="text-xs">AI</span></button>
-                        <button onClick={() => { setShowSettings(true); setIsMobileMenuOpen(false); }} className="flex flex-col items-center justify-center p-2 rounded-lg hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 gap-1"><Settings size={20}/><span className="text-xs">设置</span></button>
-                    </div>
-                 )}
-
-                 {/* Navigation Tabs */}
-                 <nav className="flex items-center gap-1 bg-slate-100/50 p-1 rounded-lg overflow-x-auto max-w-full no-scrollbar w-full md:w-auto">
-                    {[{ id: 'main', label: '主页' }, { id: 'history', label: '已行' }, { id: 'completedProjects', label: '已成' }, { id: 'weekly', label: '周报' }].map(tab => (
-                      <button key={tab.id} onClick={() => { setCurrentTab(tab.id); setEditingProjectId(null); }} className={`flex-1 px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${currentTab === tab.id && !editingProjectId ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{tab.label}</button>
-                    ))}
-                 </nav>
-
-                 {/* Desktop Actions */}
-                 <div className="hidden md:flex items-center gap-3 absolute right-8 top-3">
-                    <div className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-full border ${isOffline ? 'bg-amber-50 border-amber-200 text-amber-600 cursor-pointer' : 'bg-green-50 border-green-200 text-green-600'}`} onClick={isOffline ? handleSyncToCloud : undefined}>
+                 <div className="flex items-center gap-3">
+                    <div className={`hidden lg:flex items-center gap-1 text-[10px] px-2 py-1 rounded-full border ${isOffline ? 'bg-amber-50 border-amber-200 text-amber-600' : 'bg-green-50 border-green-200 text-green-600'}`}>
                         {isOffline ? <WifiOff size={12}/> : <Wifi size={12}/>}
-                        <span>{isOffline ? '离线(点击重连)' : '云端'}</span>
+                        <span>{isOffline ? '离线模式' : '已连接云端'}</span>
                     </div>
-                    <button onClick={handleCreateProject} className="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-4 py-2 rounded-lg text-sm font-bold transition-all">项目</button>
-                    <button onClick={() => setShowQuickCreate(true)} className="bg-indigo-600 text-white hover:bg-indigo-700 px-4 py-2 rounded-lg text-sm font-bold shadow-lg shadow-indigo-200 transition-all">节点</button>
-                    <button onClick={handleRunAdvisor} className="bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white hover:opacity-90 px-3 py-2 rounded-lg text-sm font-bold shadow-lg shadow-purple-200 flex items-center gap-1 group transition-all"><Sparkles size={16}/><span className="hidden sm:inline">AI</span></button>
+                    <button onClick={handleCreateProject} className="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-4 py-2 rounded-lg text-sm font-bold hidden sm:block transition-all">创建项目</button>
+                    <button onClick={() => setShowQuickCreate(true)} className="bg-indigo-600 text-white hover:bg-indigo-700 px-4 py-2 rounded-lg text-sm font-bold shadow-lg shadow-indigo-200 transition-all hover:scale-105 active:scale-95">快捷创建</button>
+                    <button onClick={handleRunAdvisor} className="bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white hover:opacity-90 px-3 py-2 rounded-lg text-sm font-bold shadow-lg shadow-purple-200 flex items-center gap-1 group transition-all hover:scale-105 active:scale-95"><Sparkles size={16} className="group-hover:animate-spin"/><span className="hidden sm:inline">军师分析</span></button>
                     <button onClick={() => setShowSettings(true)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors relative">
                         <Settings size={20} />
                         {isOffline && <span className="absolute top-1 right-1 w-2 h-2 bg-amber-500 rounded-full"></span>}
@@ -766,13 +606,6 @@
               </header>
 
               <main className="max-w-7xl mx-auto px-4 md:px-8 py-8">
-                 {isOffline && (
-                    <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center justify-between text-amber-800 text-xs animate-in slide-in-from-top-2">
-                        <div className="flex items-center gap-2"><WifiOff size={14}/> <span>当前显示本地缓存数据 (云端连接超时)</span></div>
-                        <button onClick={handleSyncToCloud} className="bg-amber-100 hover:bg-amber-200 px-3 py-1 rounded text-amber-900 font-bold transition-colors">{isProcessingData ? '连接中...' : '重试连接'}</button>
-                    </div>
-                 )}
-
                  {editingProjectId ? (
                    <div className="animate-in slide-in-from-right" key={editingProjectId}>
                       <div className="flex items-center justify-between mb-6">
