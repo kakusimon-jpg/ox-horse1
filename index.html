@@ -44,6 +44,7 @@
         .drag-over { background-color: rgba(99, 102, 241, 0.1); border-color: #6366f1; border-style: dashed; }
 
         /* --- 暴力隐藏 datalist 原生下拉箭头 (覆盖 PC 和 移动端) --- */
+        /* 即使在桌面端保留了 DataList 功能，也隐藏那个丑陋的小箭头 */
         
         /* 针对 WebKit 内核 (Chrome, Safari, 移动端浏览器) */
         input::-webkit-calendar-picker-indicator {
@@ -327,7 +328,7 @@
           );
         };
 
-        const TaskItem = ({ task, project, assigners, onUpdate, onDeleteRequest, onViewProject, draggable, onDragStart }) => {
+        const TaskItem = ({ task, project, assigners, onUpdate, onDeleteRequest, onViewProject, draggable, onDragStart, isMobile }) => {
            const [showDatePicker, setShowDatePicker] = useState(false);
            const isOverdue = task.plan_date && new Date(task.plan_date) < new Date() && task.status !== 'completed';
            let bgClass = "bg-white border-slate-200";
@@ -345,8 +346,8 @@
                         {project && <div onClick={onViewProject} className="text-[10px] text-slate-400 hover:text-indigo-500 cursor-pointer whitespace-nowrap">#{project.name}</div>}
                         <div className="flex items-center gap-1">
                             <span className="text-slate-300"><User size={10} /></span>
-                            <input className="text-[10px] bg-transparent outline-none text-slate-500 placeholder-slate-300 min-w-[40px]" placeholder="对接人" defaultValue={task.assigner} onBlur={(e)=>onUpdate(task.id,{assigner:e.target.value})} list={`assigners-${task.id}`} />
-                            <datalist id={`assigners-${task.id}`}>{assigners && assigners.map(a => <option key={a} value={a} />)}</datalist>
+                            <input className="text-[10px] bg-transparent outline-none text-slate-500 placeholder-slate-300 min-w-[40px]" placeholder="对接人" defaultValue={task.assigner} onBlur={(e)=>onUpdate(task.id,{assigner:e.target.value})} list={!isMobile ? `assigners-${task.id}` : undefined} />
+                            {!isMobile && <datalist id={`assigners-${task.id}`}>{assigners && assigners.map(a => <option key={a} value={a} />)}</datalist>}
                         </div>
                     </div>
                 </div>
@@ -362,16 +363,16 @@
            <div className={`p-4 rounded-xl border shadow-sm hover:shadow-md transition-all bg-white relative group fade-in ${project.wait_status==='wait_me'?'border-yellow-200 bg-yellow-50':''}`}><div className="flex justify-between mb-2"><h3 onClick={onClick} className="font-bold text-slate-700 cursor-pointer hover:text-indigo-600">{project.name}</h3><button onClick={onComplete} className="text-slate-300 hover:text-indigo-500"><Circle size={16}/></button></div><p className="text-xs text-slate-400 h-8 line-clamp-2">{project.note||'无备注'}</p><div className="flex justify-between items-center mt-3 pt-2 border-t border-slate-100"><span className="text-[10px] text-slate-300">{formatDate(project.created_at)}</span><div className="flex gap-2"><select className="text-[10px] bg-transparent outline-none cursor-pointer text-slate-500" value={project.wait_status||'normal'} onChange={(e)=>onUpdate(project.id,{wait_status:e.target.value})} onClick={e=>e.stopPropagation()}><option value="normal">进行中</option><option value="wait_me">✋ 等我</option><option value="wait_him">👉 等他</option></select><button onClick={(e)=>{e.stopPropagation(); onDeleteRequest(project.id)}} className="text-slate-200 hover:text-red-400 opacity-0 group-hover:opacity-100 hover:scale-110 transition-transform"><Trash2 size={14}/></button></div></div></div>
         );
 
-        const MainTab = ({ tasks, projects, assigners, onUpdateTask, onDeleteTaskRequest, onViewProject, onCreateProject, onDeleteProjectRequest, onUpdateProject }) => {
+        const MainTab = ({ tasks, projects, assigners, onUpdateTask, onDeleteTaskRequest, onViewProject, onCreateProject, onDeleteProjectRequest, onUpdateProject, isMobile }) => {
            const activeProjects = projects.filter(p=>p.status==='active');
            const importantTasks = tasks.filter(t=>t.status!=='completed' && t.is_important);
            const overdueTasks = tasks.filter(t => t.status !== 'completed' && !t.is_important && t.plan_date && new Date(t.plan_date) < new Date());
            return (
-             <div className="space-y-8 animate-in"><div className="grid grid-cols-1 md:grid-cols-2 gap-6"><section className="bg-white/50 p-4 rounded-xl border border-yellow-100 backdrop-blur-sm"><h3 className="flex items-center gap-2 text-lg font-bold text-slate-800 mb-3"><Star className="fill-yellow-400 text-yellow-400" size={20}/> 重要节点</h3><div className="space-y-2">{importantTasks.length > 0 ? importantTasks.map(t=>(<TaskItem key={t.id} task={t} project={projects.find(p=>p.id===t.project_id)} assigners={assigners} onUpdate={onUpdateTask} onDeleteRequest={onDeleteTaskRequest} onViewProject={()=>onViewProject(t.project_id)} />)) : <div className="text-slate-400 text-sm text-center py-4">暂无重要待办</div>}</div></section><section className="bg-white/50 p-4 rounded-xl border border-green-100 backdrop-blur-sm"><h3 className="flex items-center gap-2 text-lg font-bold text-slate-800 mb-3"><Clock className="text-green-500" size={20}/> 逾期节点</h3><div className="space-y-2">{overdueTasks.length > 0 ? overdueTasks.map(t=>(<TaskItem key={t.id} task={t} project={projects.find(p=>p.id===t.project_id)} assigners={assigners} onUpdate={onUpdateTask} onDeleteRequest={onDeleteTaskRequest} onViewProject={()=>onViewProject(t.project_id)} />)) : <div className="text-slate-400 text-sm text-center py-4">无逾期任务</div>}</div></section></div><section><h3 className="text-lg font-bold text-slate-800 mb-3">项目看板</h3><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{activeProjects.map(p=><ProjectCard key={p.id} project={p} onClick={()=>onViewProject(p.id)} onDeleteRequest={onDeleteProjectRequest} onUpdate={onUpdateProject} onComplete={()=>onUpdateProject(p.id,{status:'completed'})} />)}<button onClick={onCreateProject} className="border-2 border-dashed border-slate-300 bg-white/30 rounded-xl h-32 flex flex-col items-center justify-center text-slate-500 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50/50 transition-all"><Plus size={24}/><span className="text-xs mt-1">新项目</span></button></div></section></div>
+             <div className="space-y-8 animate-in"><div className="grid grid-cols-1 md:grid-cols-2 gap-6"><section className="bg-white/50 p-4 rounded-xl border border-yellow-100 backdrop-blur-sm"><h3 className="flex items-center gap-2 text-lg font-bold text-slate-800 mb-3"><Star className="fill-yellow-400 text-yellow-400" size={20}/> 重要节点</h3><div className="space-y-2">{importantTasks.length > 0 ? importantTasks.map(t=>(<TaskItem key={t.id} task={t} project={projects.find(p=>p.id===t.project_id)} assigners={assigners} onUpdate={onUpdateTask} onDeleteRequest={onDeleteTaskRequest} onViewProject={()=>onViewProject(t.project_id)} isMobile={isMobile} />)) : <div className="text-slate-400 text-sm text-center py-4">暂无重要待办</div>}</div></section><section className="bg-white/50 p-4 rounded-xl border border-green-100 backdrop-blur-sm"><h3 className="flex items-center gap-2 text-lg font-bold text-slate-800 mb-3"><Clock className="text-green-500" size={20}/> 逾期节点</h3><div className="space-y-2">{overdueTasks.length > 0 ? overdueTasks.map(t=>(<TaskItem key={t.id} task={t} project={projects.find(p=>p.id===t.project_id)} assigners={assigners} onUpdate={onUpdateTask} onDeleteRequest={onDeleteTaskRequest} onViewProject={()=>onViewProject(t.project_id)} isMobile={isMobile} />)) : <div className="text-slate-400 text-sm text-center py-4">无逾期任务</div>}</div></section></div><section><h3 className="text-lg font-bold text-slate-800 mb-3">项目看板</h3><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{activeProjects.map(p=><ProjectCard key={p.id} project={p} onClick={()=>onViewProject(p.id)} onDeleteRequest={onDeleteProjectRequest} onUpdate={onUpdateProject} onComplete={()=>onUpdateProject(p.id,{status:'completed'})} />)}<button onClick={onCreateProject} className="border-2 border-dashed border-slate-300 bg-white/30 rounded-xl h-32 flex flex-col items-center justify-center text-slate-500 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50/50 transition-all"><Plus size={24}/><span className="text-xs mt-1">新项目</span></button></div></section></div>
            );
         };
 
-        const PendingTab = ({ tasks, projects, assigners, onUpdateTask, onDeleteTaskRequest, onViewProject }) => {
+        const PendingTab = ({ tasks, projects, assigners, onUpdateTask, onDeleteTaskRequest, onViewProject, isMobile }) => {
             const pendingTasks = tasks.filter(t => t.status !== 'completed').sort((a,b) => {
                 if(a.plan_date && !b.plan_date) return -1;
                 if(!a.plan_date && b.plan_date) return 1;
@@ -379,16 +380,16 @@
                 return 0;
             });
             return (
-                <div className="space-y-6 animate-in"><h2 className="text-xl font-bold text-slate-800 flex items-center gap-2"><List size={24}/> 待执行任务清单</h2><div className="space-y-2">{pendingTasks.length > 0 ? pendingTasks.map(t => (<TaskItem key={t.id} task={t} project={projects.find(p => p.id === t.project_id)} assigners={assigners} onUpdate={onUpdateTask} onDeleteRequest={onDeleteTaskRequest} onViewProject={() => onViewProject(t.project_id)} />)) : <div className="text-center py-20 text-slate-400 flex flex-col items-center gap-4"><CheckCircle size={48} className="text-green-200" /><p>所有任务已完成，去喝杯咖啡吧！</p></div>}</div></div>
+                <div className="space-y-6 animate-in"><h2 className="text-xl font-bold text-slate-800 flex items-center gap-2"><List size={24}/> 待执行任务清单</h2><div className="space-y-2">{pendingTasks.length > 0 ? pendingTasks.map(t => (<TaskItem key={t.id} task={t} project={projects.find(p => p.id === t.project_id)} assigners={assigners} onUpdate={onUpdateTask} onDeleteTaskRequest={onDeleteTaskRequest} onViewProject={() => onViewProject(t.project_id)} isMobile={isMobile} />)) : <div className="text-center py-20 text-slate-400 flex flex-col items-center gap-4"><CheckCircle size={48} className="text-green-200" /><p>所有任务已完成，去喝杯咖啡吧！</p></div>}</div></div>
             );
         };
 
-        const HistoryTab = ({ tasks, projects, assigners, onUpdateTask, onDeleteTaskRequest, onViewProject }) => {
+        const HistoryTab = ({ tasks, projects, assigners, onUpdateTask, onDeleteTaskRequest, onViewProject, isMobile }) => {
           const completedTasks = tasks.filter(t => t.status === 'completed');
           const grouped = {};
           completedTasks.forEach(t => { if(!t.completed_at) return; const dateKey = new Date(t.completed_at).toLocaleDateString(); if (!grouped[dateKey]) grouped[dateKey] = []; grouped[dateKey].push(t); });
           const sortedDates = Object.keys(grouped).sort((a,b) => new Date(b) - new Date(a));
-          return (<div className="space-y-6 animate-in"><h2 className="text-xl font-bold text-slate-800">已执行节点</h2>{sortedDates.map(date => (<div key={date}><div className="flex items-center gap-4 mb-2"><span className="bg-white/80 text-slate-600 px-3 py-1 rounded-full text-xs font-bold border border-slate-100 shadow-sm">{date}</span><div className="h-px bg-slate-200 flex-1"></div></div><div className="space-y-1 pl-4">{grouped[date].map(task => (<TaskItem key={task.id} task={task} project={projects.find(p=>p.id===task.project_id)} assigners={assigners} onUpdate={onUpdateTask} onDeleteRequest={onDeleteTaskRequest} onViewProject={() => onViewProject(task.project_id)} />))}</div></div>))}{completedTasks.length === 0 && <div className="text-center text-slate-400 mt-20">还没有完成任何任务</div>}</div>);
+          return (<div className="space-y-6 animate-in"><h2 className="text-xl font-bold text-slate-800">已执行节点</h2>{sortedDates.map(date => (<div key={date}><div className="flex items-center gap-4 mb-2"><span className="bg-white/80 text-slate-600 px-3 py-1 rounded-full text-xs font-bold border border-slate-100 shadow-sm">{date}</span><div className="h-px bg-slate-200 flex-1"></div></div><div className="space-y-1 pl-4">{grouped[date].map(task => (<TaskItem key={task.id} task={task} project={projects.find(p=>p.id===task.project_id)} assigners={assigners} onUpdate={onUpdateTask} onDeleteRequest={onDeleteTaskRequest} onViewProject={() => onViewProject(task.project_id)} isMobile={isMobile} />))}</div></div>))}{completedTasks.length === 0 && <div className="text-center text-slate-400 mt-20">还没有完成任何任务</div>}</div>);
         };
 
         const CompletedProjectsTab = ({ projects, onViewProject, onDeleteProjectRequest, onUpdateProject }) => {
@@ -404,13 +405,13 @@
           return (<div className="bg-white/80 backdrop-blur-md rounded-xl shadow-sm border border-slate-100 overflow-hidden animate-in h-[calc(100vh-200px)] flex flex-col"><div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 flex-shrink-0"><div className="flex items-center gap-2"><button onClick={() => changeWeek(-1)} className="p-1 hover:bg-white rounded-lg"><ChevronLeft size={20}/></button><span className="text-sm font-bold text-slate-700 w-48 text-center">{dateRangeStr}</span><button onClick={() => changeWeek(1)} className="p-1 hover:bg-white rounded-lg"><ChevronRight size={20}/></button></div><button onClick={() => setCurrentWeekStart(getStartOfWeek(new Date()))} className="text-xs text-indigo-600 font-medium px-3 py-1 bg-indigo-50 rounded-full">回到本周</button></div><div className="grid grid-cols-5 bg-slate-50/30 border-b border-slate-100 divide-x divide-slate-100 flex-shrink-0">{weekDays.map(d => (<div key={d.toISOString()} className="p-4 text-center"><div className="text-sm font-bold text-slate-700">{['周一','周二','周三','周四','周五'][d.getDay()-1]}</div><div className="text-xs text-slate-400">{d.getMonth()+1}/{d.getDate()}</div></div>))}</div><div className="grid grid-cols-5 divide-x divide-slate-100 flex-1 overflow-y-auto">{weekDays.map(day => { const dayTasks = tasks.filter(t => t.plan_date && isSameDay(t.plan_date, day)); return (<div key={day.toISOString()} className="p-2 space-y-2 min-h-full">{dayTasks.map(t => { const proj = projects.find(p => p.id === t.project_id); return (<div key={t.id} className="bg-indigo-50/50 p-2 rounded border border-indigo-100/50 text-xs hover:bg-indigo-100 transition-colors cursor-pointer" onClick={() => onUpdateTask(t.id, { status: t.status === 'completed' ? 'active' : 'completed', completed_at: t.status === 'completed' ? null : new Date().toISOString() })}><div className="flex items-start gap-1"><div className={`mt-0.5 w-2 h-2 rounded-full ${t.status === 'completed' ? 'bg-indigo-400' : 'border border-indigo-400'}`}></div><span className={t.status === 'completed' ? 'line-through opacity-50' : ''}>{t.content}</span></div>{proj && <div className="text-[10px] text-slate-400 text-right mt-1">#{proj.name}</div>}</div>)})}</div>)})}</div></div>);
         };
 
-        const QuickCreateModal = ({ isOpen, onClose, projects, assigners, onCreate }) => {
+        const QuickCreateModal = ({ isOpen, onClose, projects, assigners, onCreate, isMobile }) => {
            const [content, setC] = useState(''); const [pid, setP] = useState(''); const [assigner, setA] = useState('');
            if(!isOpen) return null;
-           return (<div className="fixed inset-0 bg-black/30 z-[1000] flex items-center justify-center p-4 backdrop-blur-sm"><div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95"><h3 className="font-bold text-lg mb-4">快速创建</h3><form onSubmit={(e)=>{e.preventDefault(); if(content){onCreate({content, project_id:pid, assigner:assigner, plan_date:new Date().toISOString(), is_important:false}); setC(''); setA(''); onClose();}}}><input name="c" className="w-full border border-slate-200 rounded-lg p-3 mb-4 outline-none focus:border-indigo-500" autoFocus placeholder="做什么?" value={content} onChange={e=>setC(e.target.value)}/><div className="flex gap-2 mb-6"><select name="p" className="w-1/2 border border-slate-200 rounded-lg p-3 bg-white" value={pid} onChange={e=>setP(e.target.value)}><option value="">杂项 (无项目)</option>{projects.filter(p=>p.status==='active').map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select><input className="flex-1 border border-slate-200 rounded-lg p-3 bg-white outline-none text-sm" placeholder="对接人?" value={assigner} onChange={e=>setA(e.target.value)} list="quick-assigners" /><datalist id="quick-assigners">{assigners.map(a => <option key={a} value={a} />)}</datalist></div><button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-indigo-200">创建</button><button type="button" onClick={onClose} className="w-full mt-2 text-slate-400 py-2">取消</button></form></div></div>)
+           return (<div className="fixed inset-0 bg-black/30 z-[1000] flex items-center justify-center p-4 backdrop-blur-sm"><div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95"><h3 className="font-bold text-lg mb-4">快速创建</h3><form onSubmit={(e)=>{e.preventDefault(); if(content){onCreate({content, project_id:pid, assigner:assigner, plan_date:new Date().toISOString(), is_important:false}); setC(''); setA(''); onClose();}}}><input name="c" className="w-full border border-slate-200 rounded-lg p-3 mb-4 outline-none focus:border-indigo-500" autoFocus placeholder="做什么?" value={content} onChange={e=>setC(e.target.value)}/><div className="flex gap-2 mb-6"><select name="p" className="w-1/2 border border-slate-200 rounded-lg p-3 bg-white" value={pid} onChange={e=>setP(e.target.value)}><option value="">杂项 (无项目)</option>{projects.filter(p=>p.status==='active').map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select><input className="flex-1 border border-slate-200 rounded-lg p-3 bg-white outline-none text-sm" placeholder="对接人?" value={assigner} onChange={e=>setA(e.target.value)} list={!isMobile ? "quick-assigners" : undefined} />{!isMobile && <datalist id="quick-assigners">{assigners.map(a => <option key={a} value={a} />)}</datalist>}</div><button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-indigo-200">创建</button><button type="button" onClick={onClose} className="w-full mt-2 text-slate-400 py-2">取消</button></form></div></div>)
         };
 
-        const ProjectDetailView = ({ projectId, projects, tasks, assigners, onUpdateTask, onDeleteTaskRequest, onUpdateProject, handleCreateTask, onBack, handleProjectAudit }) => {
+        const ProjectDetailView = ({ projectId, projects, tasks, assigners, onUpdateTask, onDeleteTaskRequest, onUpdateProject, handleCreateTask, onBack, handleProjectAudit, isMobile }) => {
             const project = projects.find(p => p.id === projectId);
             const projectTasks = tasks.filter(t => t.project_id === projectId);
             const [taskInput, setTaskInput] = useState('');
@@ -431,7 +432,7 @@
                         <div className="flex-1 flex flex-col min-w-0 bg-white/50 backdrop-blur-sm rounded-2xl border border-slate-200 p-4 transition-colors" onDragOver={handleDragOver} onDrop={handleDropOnList}>
                             <div className="mb-4"><input className="text-lg font-bold w-full outline-none mb-2 bg-transparent" defaultValue={project.name} onBlur={e=>onUpdateProject(projectId,{name:e.target.value})} placeholder="输入项目名称..." /><textarea className="w-full h-16 text-xs text-slate-600 bg-white/50 rounded-lg p-2 outline-none resize-none border border-transparent hover:border-slate-200 focus:border-indigo-300 transition-all" defaultValue={project.note} onBlur={e=>onUpdateProject(projectId,{note:e.target.value})} placeholder="添加项目备注..." /></div>
                             <form onSubmit={(e)=>{e.preventDefault(); if(!taskInput.trim()) return; handleCreateTask({content:taskInput, project_id:projectId, assigner:'', plan_date: null, is_important:false}); setTaskInput('');}} className="flex gap-2 mb-4"><input className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-indigo-500 shadow-sm text-sm" placeholder="添加新任务..." value={taskInput} onChange={e=>setTaskInput(e.target.value)} /><button type="submit" className="bg-indigo-600 text-white px-3 rounded-xl shadow-md"><Plus size={20}/></button></form>
-                            <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar"><p className="text-xs text-slate-400 text-center mb-2">💡 将日历中的任务拖回此处可清除日期</p>{projectTasks.map(t => (<TaskItem key={t.id} task={t} project={project} assigners={assigners} onUpdate={onUpdateTask} onDeleteRequest={onDeleteTaskRequest} onViewProject={()=>{}} draggable={true} onDragStart={handleDragStart} />))}</div>
+                            <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar"><p className="text-xs text-slate-400 text-center mb-2">💡 将日历中的任务拖回此处可清除日期</p>{projectTasks.map(t => (<TaskItem key={t.id} task={t} project={project} assigners={assigners} onUpdate={onUpdateTask} onDeleteRequest={onDeleteTaskRequest} onViewProject={()=>{}} draggable={true} onDragStart={handleDragStart} isMobile={isMobile} />))}</div>
                         </div>
                         <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
                             <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50"><button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth()-1)))} className="p-1 hover:bg-slate-200 rounded transition-colors"><ChevronLeft size={20}/></button><span className="font-bold text-slate-700">{currentMonth.getFullYear()}年 {currentMonth.getMonth() + 1}月</span><button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth()+1)))} className="p-1 hover:bg-slate-200 rounded transition-colors"><ChevronRight size={20}/></button></div>
@@ -462,6 +463,18 @@
           const [breakdownLoadingId, setBreakdownLoadingId] = useState(null);
           const [confirmData, setConfirmData] = useState({ isOpen: false, id: null, type: null, title: '', msg: '' });
           const [showMobileMenu, setShowMobileMenu] = useState(false);
+          
+          // 新增：检测屏幕宽度
+          const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+          useEffect(() => {
+            const handleResize = () => {
+                setIsMobile(window.innerWidth < 768);
+            };
+            window.addEventListener('resize', handleResize);
+            return () => window.removeEventListener('resize', handleResize);
+          }, []);
+
           const assigners = useMemo(() => [...new Set(tasks.map(t => t.assigner).filter(Boolean))], [tasks]);
 
           useEffect(() => {
@@ -660,19 +673,20 @@
                       handleCreateTask={handleCreateTask}
                       onBack={() => setEditingProjectId(null)}
                       handleProjectAudit={handleProjectAudit}
+                      isMobile={isMobile}
                    />
                  ) : (
                    <>
-                     {currentTab === 'main' && <MainTab tasks={tasks} projects={projects} assigners={assigners} onUpdateTask={handleUpdateTask} onDeleteTaskRequest={requestDeleteTask} onViewProject={setEditingProjectId} onCreateProject={handleCreateProject} onDeleteProjectRequest={requestDeleteProject} onUpdateProject={handleUpdateProject} />}
-                     {currentTab === 'pending' && <PendingTab tasks={tasks} projects={projects} assigners={assigners} onUpdateTask={handleUpdateTask} onDeleteTaskRequest={requestDeleteTask} onViewProject={setEditingProjectId} />}
-                     {currentTab === 'history' && <HistoryTab tasks={tasks} projects={projects} assigners={assigners} onUpdateTask={handleUpdateTask} onDeleteTaskRequest={requestDeleteTask} onViewProject={setEditingProjectId} />}
+                     {currentTab === 'main' && <MainTab tasks={tasks} projects={projects} assigners={assigners} onUpdateTask={handleUpdateTask} onDeleteTaskRequest={requestDeleteTask} onViewProject={setEditingProjectId} onCreateProject={handleCreateProject} onDeleteProjectRequest={requestDeleteProject} onUpdateProject={handleUpdateProject} isMobile={isMobile} />}
+                     {currentTab === 'pending' && <PendingTab tasks={tasks} projects={projects} assigners={assigners} onUpdateTask={handleUpdateTask} onDeleteTaskRequest={requestDeleteTask} onViewProject={setEditingProjectId} isMobile={isMobile} />}
+                     {currentTab === 'history' && <HistoryTab tasks={tasks} projects={projects} assigners={assigners} onUpdateTask={handleUpdateTask} onDeleteTaskRequest={requestDeleteTask} onViewProject={setEditingProjectId} isMobile={isMobile} />}
                      {currentTab === 'completedProjects' && <CompletedProjectsTab projects={projects} onViewProject={setEditingProjectId} onDeleteProjectRequest={requestDeleteProject} onUpdateProject={handleUpdateProject} />}
                      {currentTab === 'weekly' && <WeeklyReportTab tasks={tasks} projects={projects} onUpdateTask={handleUpdateTask} />}
                    </>
                  )}
               </main>
 
-              <QuickCreateModal isOpen={showQuickCreate} onClose={() => setShowQuickCreate(false)} projects={projects} assigners={assigners} onCreate={handleCreateTask} />
+              <QuickCreateModal isOpen={showQuickCreate} onClose={() => setShowQuickCreate(false)} projects={projects} assigners={assigners} onCreate={handleCreateTask} isMobile={isMobile} />
               <AnalysisModal isOpen={showAIModal} onClose={() => setShowAIModal(false)} result={analysisResult} isAnalyzing={isAnalyzing} />
               <ProjectAuditModal isOpen={showAuditModal} onClose={() => setShowAuditModal(false)} data={auditResult} isAnalyzing={auditLoading} onAddTasks={handleConfirmAuditTasks} />
               <ConfirmDialog isOpen={confirmData.isOpen} onClose={() => setConfirmData({ ...confirmData, isOpen: false })} onConfirm={executeDelete} title={confirmData.title} message={confirmData.msg} />
